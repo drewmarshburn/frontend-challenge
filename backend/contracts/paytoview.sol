@@ -1,14 +1,14 @@
 pragma solidity >=0.4.24 <0.6.0;
 
 contract CoinInterface {
-    function transfer(address _to, uint256 _value) public returns (bool success);
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool success);
 }
 
 /**
   * @title paytoview
   * @dev Allows someone to purchase access to a string
   */
-contract paytoview {
+contract PayToView {
     address public owner;
     uint public price;
     CoinInterface public ffContract;
@@ -34,7 +34,7 @@ contract paytoview {
      function buySecret() public {
          require(msg.sender != owner, "You are the ownder.");
          require(!allowedToView[msg.sender], "You own this already.");
-         require(ffContract.transfer(owner, price), "Problem with transfer.");
+         require(ffContract.transferFrom(msg.sender, owner, price), "Problem with transfer.");
 
          allowedToView[msg.sender] = true;
      }
