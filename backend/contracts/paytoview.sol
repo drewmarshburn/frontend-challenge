@@ -1,6 +1,6 @@
 pragma solidity >=0.4.24 <0.6.0;
 
-import "./fortissimo.sol";
+//import "./coininterface.sol";
 
 /**
   * @title paytoview
@@ -9,20 +9,22 @@ import "./fortissimo.sol";
 contract paytoview {
     address public owner;
     uint public price;
-    Fortissimo public ffContract;
+    //CoinInterface public ffContract;
     string private secret;
+    address public ffContract;
 
     /* Stores addresses of those allowed to view the secret */
-    mapping (address => bool) private allowedToView;
+    mapping (address => bool) public allowedToView;
 
     /**
       * @dev Sets the owner, price, secret, and exchange contract
       */
-    constructor(address _owner, string memory _secret, uint _price, Fortissimo _ffContract) public {
+    constructor(address _owner, string memory _secret, uint _price, address _ffCtrAddr) public {
         owner = _owner;
         secret = _secret;
         price = _price;
-        ffContract = _ffContract;
+        //ffContract = CoinInterface(_ffCtrAddr);
+        ffContract = _ffCtrAddr;
         allowedToView[owner] = true;
     }
 
@@ -40,7 +42,7 @@ contract paytoview {
      function buySecret(address _purchaser) public {
          require(msg.sender != owner, "You are the ownder.");
          require(!allowedToView[msg.sender], "You own this already.");
-         require(ffContract.transfer(owner, price));
+         //require(ffContract.transfer(owner, price));
 
          allowedToView[_purchaser] = true;
      }
