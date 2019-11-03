@@ -34,7 +34,7 @@ contract paytoview {
      function buySecret() public {
          require(msg.sender != owner, "You are the ownder.");
          require(!allowedToView[msg.sender], "You own this already.");
-         require(ffContract.transfer(owner, price));
+         require(ffContract.transfer(owner, price), "Problem with transfer.");
 
          allowedToView[msg.sender] = true;
      }
@@ -43,7 +43,7 @@ contract paytoview {
       * @dev See the secret if you're allowed
       */
     function seeSecret() public view returns (string memory _secret) {
-        require(allowedToView[msg.sender]);
-        return _secret;
+        require(allowedToView[msg.sender], "You must purchase access.");
+        return secret;
     }
 }
