@@ -32,7 +32,7 @@ contract PayToView {
      * @dev Buy the secret
      */
      function buySecret() public {
-         require(msg.sender != owner, "You are the ownder.");
+         require(msg.sender != owner, "You are the owner.");
          require(!allowedToView[msg.sender], "You own this already.");
          require(ffContract.transferFrom(msg.sender, owner, price), "Problem with transfer.");
 
