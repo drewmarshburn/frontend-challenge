@@ -14,7 +14,8 @@ const {
   PORT,
   FROM_ADDRESS,
   CONTRACT_MAIN_SOURCE_FILE,
-  CONTRACT_CLASS_NAME
+  CONTRACT_CLASS_NAME,
+  API_TOKEN
 } = require('./config');
 
 // Set up the session used for logging in/out
@@ -46,6 +47,7 @@ app.use(function requireLogin(req, res, next) {
 });
 
 app.get("/login", async(req, res) => {
+    console.log("Get request made.");
     res.status(200).send("You need to login.");
 });
 
@@ -184,6 +186,25 @@ app.post('/paytoview', async(req, res) => {
     }
     catch (err) {
         console.log(postRes);
+        res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
+    }
+});
+
+app.get('/transactions', async(req, res) => {
+    console.log("Transaction request");
+    let getRes;
+    try {
+        getRes = await fetch("https://console.kaleido.io/api/v1/ledger/u0wer0z0ol/u0zn6f7wvi/transactions/", {
+            headers: {'Authorization': 'Bearer ' + API_TOKEN}
+        });
+        var myRes = await getRes.json();
+        res.status(200).send(myRes);
+
+        // NOTE: Should probably do some processing
+
+    }
+    catch (err) {
+        console.log(getRes);
         res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
     }
 });

@@ -14,6 +14,10 @@ contract PayToView {
     CoinInterface public ffContract;
     string private secret;
 
+    // Event to indicate the contract was created
+    event Creation(address indexed _owner, uint _price);
+    event Purchase(address indexed _buyer);
+
     /* Stores addresses of those allowed to view the secret */
     mapping (address => bool) public allowedToView;
 
@@ -26,6 +30,7 @@ contract PayToView {
         price = _price;
         ffContract = CoinInterface(_ffCtrAddr);
         allowedToView[owner] = true;
+        emit Creation(msg.sender, price);
     }
 
     /**
@@ -36,6 +41,7 @@ contract PayToView {
          require(!allowedToView[msg.sender], "You own this already.");
          require(ffContract.transferFrom(msg.sender, owner, price), "Problem with transfer.");
 
+         emit Purchase(msg.sender);
          allowedToView[msg.sender] = true;
      }
 
