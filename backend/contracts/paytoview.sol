@@ -14,11 +14,9 @@ contract PayToView {
     CoinInterface public ffContract;
     string private secret;
 
-    // Event to indicate the contract was created
     event Creation(address indexed _owner, uint _price);
     event Purchase(address indexed _buyer);
 
-    /* Stores addresses of those allowed to view the secret */
     mapping (address => bool) public allowedToView;
 
     /**

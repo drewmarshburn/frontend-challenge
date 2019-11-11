@@ -8,13 +8,9 @@ const bodyparser = require('body-parser');
 const session = require('express-session');
 
 const {
-  KALEIDO_REST_GATEWAY_URL,
   KALEIDO_AUTH_USERNAME,
   KALEIDO_AUTH_PASSWORD,
   PORT,
-  FROM_ADDRESS,
-  CONTRACT_MAIN_SOURCE_FILE,
-  CONTRACT_CLASS_NAME,
   API_TOKEN
 } = require('./config');
 
@@ -31,15 +27,23 @@ app.use(session({
 // Addresses of the fortissimo contract used for all transactions
 let tokenContractAddress = '0xa2a98f63e074ed6269ff9c2e42dd9e30e7012244';
 
-// Clients for the contracts
+// Swagger clients for the contracts
 let tokenClient;
 let payToViewClient;
 
+// Kaleido settings
+const kaleido_env = "u0zn6f7wvi";
+const kaleido_cnst = "u0wer0z0ol";
+const payToViewAPIPath = "u0dm7jynd6";
+
 app.use(bodyparser.json());
+
+/********** Account management **********/
 
 // Middleware redirects users that are not logged in to the login page
 app.use(function requireLogin(req, res, next) {
     if (req.path !== "/login" && !req.session.user) {
+        console.log("Login redirect.");
         res.redirect("/login");
     } else {
         next();
@@ -47,7 +51,6 @@ app.use(function requireLogin(req, res, next) {
 });
 
 app.get("/login", async(req, res) => {
-    console.log("Get request made.");
     res.status(200).send("You need to login.");
 });
 
@@ -60,11 +63,35 @@ app.post("/login", async(req, res) => {
             delete req.session.user;
         }
 
-        // Set "user" on the session to the address
+        // Set user and node on the session
         req.session.user = req.body.address;
+        req.session.node = req.body.node;
 
-        console.log("Logged in as: " + req.session.user);
-        res.status(200).send(req.session.user);
+        // Create the API pathways for the user
+        const tokenAPIPath = "u0tdtmyf12";
+        let tokenAPIURL = 'https://' + kaleido_env + '-' + req.body.node +
+            '-connect.us0-aws.kaleido.io/gateways/' + tokenAPIPath + '?swagger';
+        let payToViewAPIURL = 'https://' + kaleido_env + '-' + req.body.node +
+            '-connect.us0-aws.kaleido.io/gateways/'  + payToViewAPIPath + '?swagger';
+
+        console.log("Swagger client pathways:");
+        console.log(tokenAPIURL);
+        console.log(payToViewAPIURL);
+
+        // Get the swagger clients
+        tokenClient = await Swagger(tokenAPIURL, {
+            requestInterceptor: req => {
+                req.headers.authorization = `Basic ${Buffer.from(`${KALEIDO_AUTH_USERNAME}:${KALEIDO_AUTH_PASSWORD}`).toString("base64")}`;
+            }
+        });
+        payToViewClient = await Swagger(payToViewAPIURL, {
+            requestInterceptor: req => {
+                req.headers.authorization = `Basic ${Buffer.from(`${KALEIDO_AUTH_USERNAME}:${KALEIDO_AUTH_PASSWORD}`).toString("base64")}`;
+            }
+        });
+
+        console.log("Logged in as: " + req.session.user + " on: " + req.session.node);
+        res.status(200).send({"user": req.session.user, "node": req.session.node});
     }
     catch (err) {
         res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
@@ -74,7 +101,7 @@ app.post("/login", async(req, res) => {
 // View the information of the currently logged in user
 app.get("/account", async(req, res) => {
     try {
-        res.status(200).send(req.session.user);
+        res.status(200).send({user: req.session.user, node: req.session.node});
     }
     catch (err) {
         res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
@@ -88,14 +115,15 @@ app.get("/logout", async(req, res) => {
             console.log("Logged out for: " + req.session.user);
             delete req.session.user;
         }
-        res.redirect("/login");
     }
     catch (err) {
         res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
     }
 });
 
-// Request to get the balance of an address
+/********** Fortissimo coin management **********/
+
+// Request to get the balance of the currently logged in user
 app.get('/fortissimo/balance/', async(req, res) => {
     try {
         let postRes = await tokenClient.apis.default.balanceOf_get({
@@ -104,7 +132,7 @@ app.get('/fortissimo/balance/', async(req, res) => {
             "_owner": req.session.user,
             "kld-from": req.session.user,
         });
-        console.log("Balance for: " + req.session.user + ". Amount: " + postRes.body["balance"]);
+        console.log("Balance for: " + req.session.user + ". Amount: " + postRes.body.balance);
         res.status(200).send(postRes.body);
     }
     catch(err) {
@@ -112,7 +140,7 @@ app.get('/fortissimo/balance/', async(req, res) => {
     }
 });
 
-// Request to send an approve
+// Approve another entity to spend money on behalf of the current user
 app.post('/fortissimo/approve', async(req, res)=> {
     try {
         let postRes = await tokenClient.apis.default.approve_post({
@@ -132,6 +160,8 @@ app.post('/fortissimo/approve', async(req, res)=> {
         res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
     }
 });
+
+/********** PayToView contract management **********/
 
 // Request to purchase access to a secret contract
 app.post('/paytoview/:contract_address/buySecret', async(req,res) => {
@@ -168,9 +198,6 @@ app.get('/paytoview/:contract_address/secret', async(req, res) => {
 
 // Create a new instance of paytoview
 app.post('/paytoview', async(req, res) => {
-    console.log("PayToView user: " + req.session.user);
-    console.log("Price: " + req.body.price);
-    console.log("Secret: " + req.body.secret);
     let postRes;
     try {
         postRes = await payToViewClient.apis.default.constructor_post({
@@ -190,18 +217,217 @@ app.post('/paytoview', async(req, res) => {
     }
 });
 
-app.get('/transactions', async(req, res) => {
-    console.log("Transaction request");
+// TODO: Remove!
+// // Get the top 25 transactions in the ledger
+// app.get('/transactions', async(req, res) => {
+//     console.log("Transaction request");
+//     let getRes;
+//     try {
+//         getRes = await fetch("https://console.kaleido.io/api/v1/ledger/u0wer0z0ol/u0zn6f7wvi/transactions/", {
+//             headers: {'Authorization': 'Bearer ' + API_TOKEN}
+//         });
+//         var myRes = await getRes.json();
+//         res.status(200).send(myRes);
+//     }
+//     catch (err) {
+//         console.log(getRes);
+//         res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
+//     }
+// });
+
+// Returns PayToView instances that the current user may want to purchase
+app.get('/shop', async(req, res) => {
     let getRes;
     try {
-        getRes = await fetch("https://console.kaleido.io/api/v1/ledger/u0wer0z0ol/u0zn6f7wvi/transactions/", {
+        getRes = await fetch("https://console.kaleido.io/api/v1/ledger/" +
+            kaleido_cnst + "/" + kaleido_env + "/gateway_apis/" +
+            payToViewAPIPath + "/contracts/", {
             headers: {'Authorization': 'Bearer ' + API_TOKEN}
         });
-        var myRes = await getRes.json();
-        res.status(200).send(myRes);
+        var results = await getRes.json();
 
-        // NOTE: Should probably do some processing
+        // Filter listings made by the user
+        var filteredContracts = results.contracts.filter(f => f.creator.toLowerCase() !== req.session.user.toLowerCase());
 
+        // Pair all listings with their transactions
+        for (var i = 0; i < filteredContracts.length; i++) {
+
+            var txns = await fetch(
+                "https://console.kaleido.io/api/v1/ledger/" + kaleido_cnst +
+                "/" + kaleido_env + "/addresses/" + filteredContracts[i].address + "/transactions",
+                {
+                    headers: {'Authorization': 'Bearer ' + API_TOKEN}
+                }
+            );
+            var txn_json = await txns.json();
+
+            filteredContracts[i] = {
+                address: filteredContracts[i].address,
+                transactions: txn_json
+            };
+        }
+
+        // Check listings for transaction indicating purchase by this user
+        var avialableContracts = filteredContracts.filter(f => {
+
+            // Check each transaction for the buyer
+            for (x of f.transactions) {
+                if (x.from.toLowerCase() === req.session.user.toLowerCase()) {
+                    return false;
+                }
+            }
+
+            // If no transaction mentions this user, they do not own this contract
+            return true;
+        }).map(f => f.address);
+
+        // Get price and owner information for eligible contracts
+        for (var i = 0; i < avialableContracts.length; i++) {
+
+            let priceRes = await payToViewClient.apis.default.price_get({
+                address: avialableContracts[i],
+                body: {},
+                "kld-from": req.session.user,
+            });
+
+            let ownerRes = await payToViewClient.apis.default.owner_get({
+                address: avialableContracts[i],
+                body: {},
+                "kld-from": req.session.user,
+            });
+
+            avialableContracts[i] = {
+                address: avialableContracts[i],
+                price: priceRes.body.output,
+                owner: ownerRes.body.output
+            };
+        }
+        res.status(200).send(avialableContracts);
+    }
+    catch (err) {
+        console.log(getRes);
+        res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
+    }
+});
+
+// Returns PayToView instances already bought by the user
+app.get('/my_purchases', async(req, res) => {
+    let getRes;
+    try {
+        getRes = await fetch("https://console.kaleido.io/api/v1/ledger/" +
+            kaleido_cnst + "/" + kaleido_env + "/gateway_apis/" +
+            payToViewAPIPath + "/contracts/", {
+            headers: {'Authorization': 'Bearer ' + API_TOKEN}
+        });
+        var results = await getRes.json();
+
+        // Filter contracts made by the user
+        var filteredContracts = results.contracts.filter(f => {
+            return f.creator.toLowerCase() !== req.session.user.toLowerCase();
+        });
+
+        // Pair all contracts with their transactions
+        for (var i = 0; i < filteredContracts.length; i++) {
+
+            var txns = await fetch(
+                "https://console.kaleido.io/api/v1/ledger/" + kaleido_cnst +
+                "/" + kaleido_env + "/addresses/" +
+                filteredContracts[i].address + "/transactions",
+                {
+                    headers: {'Authorization': 'Bearer ' + API_TOKEN}
+                }
+            );
+            var txn_json = await txns.json();
+
+            filteredContracts[i] = {
+                address: filteredContracts[i].address,
+                transactions: txn_json
+            };
+        }
+
+        // Check listings for transaction indicating purchase
+        var purchasedContracts = filteredContracts.filter(f => {
+
+            // Check each transaction for the current user
+            for (x of f.transactions) {
+                if (x.from.toLowerCase() === req.session.user.toLowerCase()) {
+                    return true;
+                }
+            }
+
+            // If a transaction does not mention the current user, they do not own
+            // this contract
+            return false;
+        }).map(f => f.address);
+
+        // Get price and secret for purchased contracts
+        for (var i = 0; i < purchasedContracts.length; i++) {
+
+            let priceRes = await payToViewClient.apis.default.price_get({
+                address: purchasedContracts[i],
+                body: {},
+                "kld-from": req.session.user,
+            });
+
+            let secretRes = await payToViewClient.apis.default.seeSecret_get({
+                address: purchasedContracts[i],
+                body: {},
+                "kld-from": req.session.user,
+            });
+
+            purchasedContracts[i] = {
+                address: purchasedContracts[i],
+                price: priceRes.body.output,
+                secret: secretRes.body._secret
+            };
+        }
+
+        res.status(200).send(purchasedContracts);
+    }
+    catch (err) {
+        console.log(getRes);
+        res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
+    }
+});
+
+// Returns PayToView contracts created by the user
+app.get('/my_listings', async(req, res) => {
+    let getRes;
+    try {
+        getRes = await fetch("https://console.kaleido.io/api/v1/ledger/" +
+            kaleido_cnst + "/" + kaleido_env + "/gateway_apis/" +
+            payToViewAPIPath + "/contracts/", {
+            headers: {'Authorization': 'Bearer ' + API_TOKEN}
+        });
+        var results = await getRes.json();
+
+        // Filter listings made by other users
+        var myContracts = results.contracts.filter(f => {
+            return f.creator.toLowerCase() === req.session.user.toLowerCase();
+        });
+
+        // Get the price and secret for the user's contracts
+        for (var i = 0; i < myContracts.length; i++) {
+
+            let priceRes = await payToViewClient.apis.default.price_get({
+                address: myContracts[i].address,
+                body: {},
+                "kld-from": req.session.user,
+            });
+
+            let secretRes = await payToViewClient.apis.default.seeSecret_get({
+                address: myContracts[i].address,
+                body: {},
+                "kld-from": req.session.user,
+            });
+
+            myContracts[i] = {
+                address: myContracts[i].address,
+                price: priceRes.body.output,
+                secret: secretRes.body._secret
+            };
+        }
+        res.status(200).send(myContracts);
     }
     catch (err) {
         console.log(getRes);
@@ -210,24 +436,6 @@ app.get('/transactions', async(req, res) => {
 });
 
 async function init() {
-
-    let tokenAPIURL = 'https://u0zn6f7wvi-u0zl2kses9-connect.us0-aws.kaleido.io/gateways/u0tdtmyf12?swagger';
-    let payToViewAPIURL = 'https://u0zn6f7wvi-u0zl2kses9-connect.us0-aws.kaleido.io/gateways/u0vqg7j1jk?swagger';
-
-    // Get the swagger client for fortissimo deployed to an environment
-    tokenClient = await Swagger(tokenAPIURL, {
-        requestInterceptor: req => {
-            req.headers.authorization = `Basic ${Buffer.from(`${KALEIDO_AUTH_USERNAME}:${KALEIDO_AUTH_PASSWORD}`).toString("base64")}`;
-        }
-    });
-
-    // Get the swagger client for the paytoview contract deployed to an environment
-    payToViewClient = await Swagger(payToViewAPIURL, {
-        requestInterceptor: req => {
-            req.headers.authorization = `Basic ${Buffer.from(`${KALEIDO_AUTH_USERNAME}:${KALEIDO_AUTH_PASSWORD}`).toString("base64")}`;
-        }
-    });
-
     // Start listening
     app.listen(PORT, () => console.log(`Kaleido DApp backend listening on port ${PORT}!`))
 }
