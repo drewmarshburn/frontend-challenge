@@ -20,7 +20,6 @@ export default class ShopPage extends Component {
     }
 
     handleChange(event) {
-        // NOTE: use the setState function to update the state
         this.setState({value: event.target.value});
     }
 
@@ -41,6 +40,7 @@ export default class ShopPage extends Component {
         }
     }
 
+    // Get the items this user can purchase
     async getShopListings() {
         try {
             const res = await fetch("/shop");
@@ -57,35 +57,36 @@ export default class ShopPage extends Component {
         }
     }
 
+    // Purchase an item in the table
     async makePurchase(event, row) {
-        console.log("Purchase");
-        console.log(row);
-
-        //var ctrAddress = row.address;
-
         try {
-            const approval = await fetch("/fortissimo/approve", {
+
+            // Send approval for currency transfer
+            await fetch("/fortissimo/approve", {
                 method: 'post',
-                body: {
-                    spender: row.address,
-                    value: row.price
-                }
+                body: JSON.stringify( {
+                        'spender': row.row.address,
+                        'value': row.row.price,
+                    }),
+                headers: { 'Content-Type': 'application/json' }
             });
 
-            const purchase = await fetch("/paytoview/" + row.address + "/buySecret", {
+            // Fire buy action on contract
+            await fetch("/paytoview/" + row.row.address + "/buySecret", {
                 method: 'post',
             });
 
-            // TODO: Link to purchased?
-
+            console.log("Purchased: " + row.row.address);
+            // Refresh the shop listings
+            this.getShopListings();
         } catch (err) {
             console.log("Error when processing makePurchase: " + err);
         }
     }
 
-    // Lifecycle method once component has been put into DOM for the first time
     componentDidMount() {
 
+        // Redirect users who are not logged in
         if (!this.state.user) {
             alert("Login required.");
             this.props.history.push({

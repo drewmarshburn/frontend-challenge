@@ -21,6 +21,7 @@ class LoginPage extends Component {
         this.setState({[event.target.name]: event.target.value});
     }
 
+    // Handle submission of login form
     async handleSubmit(event) {
         event.preventDefault();
         console.log("Login submitted for: " + this.state.address + " on: " + this.state.node);
@@ -48,12 +49,15 @@ class LoginPage extends Component {
 
     render() {
         return (
-            <div align="center" style={{maxWidth: 400 + "px"}}>
+            <div className="text-center" style={{display: "flex", flexDirection: "column",
+                justifyContent: "center", maxWidth: "500px", margin: "auto"}}>
+            <h2 > Fortissimo Marketplace Login </h2>
             <Form>
-                <Form.Group>
+                <Form.Group style={{display: 'flex', justifyContent: "center", flexDirection: "column"}}>
                     <Form.Label>Address</Form.Label>
                     <Form.Control name="address" type="text" placeholder="Hex address"
-                        value={this.state.address} onChange={this.handleChange}/>
+                        value={this.state.address} onChange={this.handleChange}
+                    />
                 </Form.Group>
                 <Form.Group>
                     <Form.Label>Node</Form.Label>

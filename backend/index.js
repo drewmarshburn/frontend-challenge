@@ -142,6 +142,8 @@ app.get('/fortissimo/balance/', async(req, res) => {
 
 // Approve another entity to spend money on behalf of the current user
 app.post('/fortissimo/approve', async(req, res)=> {
+    console.log("Approval");
+    console.log(req.body);
     try {
         let postRes = await tokenClient.apis.default.approve_post({
             address: tokenContractAddress,
@@ -198,6 +200,8 @@ app.get('/paytoview/:contract_address/secret', async(req, res) => {
 
 // Create a new instance of paytoview
 app.post('/paytoview', async(req, res) => {
+    console.log("Create paytoview");
+    console.log(req.body);
     let postRes;
     try {
         postRes = await payToViewClient.apis.default.constructor_post({
@@ -216,24 +220,6 @@ app.post('/paytoview', async(req, res) => {
         res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
     }
 });
-
-// TODO: Remove!
-// // Get the top 25 transactions in the ledger
-// app.get('/transactions', async(req, res) => {
-//     console.log("Transaction request");
-//     let getRes;
-//     try {
-//         getRes = await fetch("https://console.kaleido.io/api/v1/ledger/u0wer0z0ol/u0zn6f7wvi/transactions/", {
-//             headers: {'Authorization': 'Bearer ' + API_TOKEN}
-//         });
-//         var myRes = await getRes.json();
-//         res.status(200).send(myRes);
-//     }
-//     catch (err) {
-//         console.log(getRes);
-//         res.status(500).send({error: `${err.response && err.response.body && err.response.text}\n${err.stack}`});
-//     }
-// });
 
 // Returns PayToView instances that the current user may want to purchase
 app.get('/shop', async(req, res) => {

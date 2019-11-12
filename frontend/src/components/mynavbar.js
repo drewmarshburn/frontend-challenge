@@ -13,17 +13,17 @@ class MyNavbar extends Component {
         this.handleLogout = this.handleLogout.bind(this);
     }
 
+    // Send logout action to the server
     async handleLogout() {
         console.log("Logout");
         await fetch("/logout");
     }
 
-    // Returns HTML for the navbar
     render() {
         return (
             <div>
             <Navbar bg="dark" variant="dark">
-                <Navbar.Brand href="#home">
+                <Navbar.Brand>
                     <img
                         src={logo}
                         width="40"

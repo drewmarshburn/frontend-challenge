@@ -1,15 +1,12 @@
 import React, {Component} from 'react';
+
 import ReactTable from 'react-table';
 import 'react-table/react-table.css';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
-
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
 import Form from 'react-bootstrap/Form';
-import Container from 'react-bootstrap/Container';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
 
 import MyNavbar from '../components/mynavbar'
 
@@ -17,12 +14,13 @@ export default class HomePage extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            //user: (props.location.data || {}).user,
-            user: "0x9b1Ac985Ec7127FD29065dC29A5f1138a1b61BaD",
-            balance: '', // Keep track of the user's Fortissimo balance
-            contracts: [],
-            purchased: [],
-            showModal: false,
+            user: (props.location.data || {}).user, // User account
+            balance: '', // User's Fortissimo balance
+            myContracts: [], // Contracts created by the user
+            purchased: [], // Contracts purchased by the user
+
+            // Following used for contract creation modal
+            showCreateModal: false,
             secret: '',
             price: ''
         };
@@ -62,7 +60,7 @@ export default class HomePage extends Component {
             if (!res.ok) {
                 console.log("Error when getting my listings");
             } else {
-                this.setState({contracts: res_json});
+                this.setState({myContracts: res_json});
             }
         } catch (err) {
             console.log("Error when getting my listings.");
@@ -79,6 +77,7 @@ export default class HomePage extends Component {
                 console.log("Error when getting my purchases");
             } else {
                 this.setState({purchased: res_json});
+                console.log(this.state.purchased);
             }
         } catch (err) {
             console.log("Error when getting my purchases.");
@@ -87,37 +86,44 @@ export default class HomePage extends Component {
     }
 
     openModal() {
-        this.setState({showModal: true});
+        this.setState({showCreateModal: true});
     }
 
     closeModal() {
-        this.setState({showModal: false});
+        this.setState({showCreateModal: false});
     }
 
     async handleSubmit(event) {
         event.preventDefault();
-        console.log("Create " + this.state.secret + " cost " + this.state.price);
 
         try {
 
-            const res = await fetch("/paytoview", {
+            await fetch("/paytoview", {
                 method: 'post',
-                body: {
-                    price: this.state.price,
-                    secret: this.state.secret
-                }
+                body: JSON.stringify( {
+                        'price': this.state.price,
+                        'secret': this.state.secret,
+                    }),
+                headers: { 'Content-Type': 'application/json' }
             });
 
-            this.setState({showModal: false});
+            console.log("Create " + this.state.secret + " cost " + this.state.price);
+            this.closeModal();
+            this.getMyListings();
+            // Clear the input form state
+            this.setState({
+                secret: '',
+                price: ''
+            });
         } catch (err) {
             console.log("Error when submitting new data.");
             console.log(err);
         }
     }
-    
-    componentDidMount() {
-        console.log(this.state.user);
 
+    componentDidMount() {
+
+        // Redirect users who are not logged in
         if (!this.state.user) {
             alert("Login required.");
             this.props.history.push({
@@ -160,12 +166,12 @@ export default class HomePage extends Component {
                 <MyNavbar data={{user: this.state.user, balance: this.state.balance}}/>
             </div>
             <div style={{marginBottom: "50px"}}>
-                <h2 class="text-center"> My Posted Data </h2>
+                <h2> My Posted Data </h2>
                 <Button className="float-right" onClick={this.openModal} >Compose</Button>
             </div>
 
             <div>
-                <ReactTable data={this.state.contracts}
+                <ReactTable data={this.state.myContracts}
                     columns={postedDataColumns}
                     defaultPageSize={5}
                 />
@@ -176,15 +182,15 @@ export default class HomePage extends Component {
                     defaultPageSize={5}
                 />
 
-                <Modal show={this.state.showModal} onHide={this.closeModal}>
+                <Modal show={this.state.showCreateModal} onHide={this.closeModal}>
                     <Form>
                         <Form.Group>
-                            <Form.Label>Address</Form.Label>
+                            <Form.Label>Secret</Form.Label>
                             <Form.Control name="secret" type="text" placeholder="Enter your secret"
                                 value={this.state.secret} onChange={this.handleChange}/>
                         </Form.Group>
                         <Form.Group>
-                            <Form.Label>Node</Form.Label>
+                            <Form.Label>Price</Form.Label>
                             <Form.Control name="price" type="text" placeholder="Enter the price"
                                 value={this.state.price} onChange={this.handleChange}/>
                         </Form.Group>
